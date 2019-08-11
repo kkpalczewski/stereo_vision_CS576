@@ -1,0 +1,298 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% CS576 Written Question Template
+%
+% Acknowledgements:
+% The original code is written by Prof. James Tompkin (james_tompkin@brown.edu).
+% The second version is revised by Prof. Min H. Kim (minhkim@kaist.ac.kr).
+%
+% This is a LaTeX document. LaTeX is a markup language for producing 
+% documents. Your task is to fill out this document, then to compile 
+% it into a PDF document. 
+%
+% 
+% TO COMPILE:
+% > pdflatex thisfile.tex
+%
+% If you do not have LaTeX and need a LaTeX distribution:
+% - Personal laptops (all common OS): www.latex-project.org/get/
+% - We recommend latex compiler miktex (https://miktex.org/) for windows,
+%   macTex (http://www.tug.org/mactex/) for macOS users.
+%   And TeXstudio(http://www.texstudio.org/) for latex editor.
+%   You should install both compiler and editor for editing latex.
+%   The another option is Overleaf (https://www.overleaf.com/) which is 
+%   an online latex editor.
+%
+% If you need help with LaTeX, please come to office hours. 
+% Or, there is plenty of help online:
+% https://en.wikibooks.org/wiki/LaTeX
+%
+% Good luck!
+% Min and the CS576 staff
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% How to include two graphics on the same line:
+% 
+% \includegraphics[\width=0.49\linewidth]{yourgraphic1.png}
+% \includegraphics[\width=0.49\linewidth]{yourgraphic2.png}
+%
+% How to include equations:
+%
+% \begin{equation}
+% y = mx+c
+% \end{equation}
+% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[11pt]{article}
+\usepackage[backend=biber]{biblatex} %Imports biblatex package
+\addbibresource{references.bib} %Import the bibliography file
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[colorlinks = true,
+            linkcolor = blue,
+            urlcolor  = blue]{hyperref}
+\usepackage[a4paper,margin=1.5in]{geometry}
+\usepackage{stackengine,graphicx}
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+\usepackage{microtype}
+\usepackage{times}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath} %bmatrix, vmatrix ...
+
+% From https://ctan.org/pkg/matlab-prettifier
+\usepackage[numbered,framed]{matlab-prettifier}
+
+
+
+
+\frenchspacing
+\setlength{\parindent}{0cm} % Default is 15pt.
+\setlength{\parskip}{0.3cm plus1mm minus1mm}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Homework Writeup - Krzysztof Palczewski (20196151)}
+\rhead{CS576}
+\rfoot{\thepage}
+
+\date{}
+
+\title{\vspace{-1cm}Homework 1 Writeup}
+
+
+\begin{document}
+\maketitle
+\vspace{-3cm}
+\thispagestyle{fancy}
+
+\section*{Objective of the work}
+
+The main objectives of the work were:
+\begin{itemize}
+    \item Finding extrinsic and intrinsic parameters of the cameras to stereo vision application using Zhang' Method \cite{zhang2000flexible}
+    \item Depth estimation of the objects at the two photos using plane sweeping algorithm
+\end{itemize}
+
+To this task I used Matlab Toolbox with dependencies: Optimization Toolbox and Computer Vision System Toolbox.
+
+\section*{Zhang's method for finding camera parameters}
+
+Method described in article \cite{zhang2000flexible} uses checkerboard to find extrinsic and intrinsic camera parameters. In the work I used 6 images to calibrate left camera and 6 to calibrate right camera.
+
+\subsection*{Finding intrinsic parameters of the cameras}
+Relation between points in the model space and image space could be written as:
+$$s\begin{bmatrix}u \\ v \\ 1\end{bmatrix} =
+\mathbf{K}\begin{bmatrix}\mathbf{r_1} & \mathbf{r_2} & \mathbf{r_3} & \mathbf{t} \end{bmatrix}\begin{bmatrix}X \\ Y \\ Z \\ 1\end{bmatrix}$$, 
+
+where $s$ is a scaling factor,
+$\begin{bmatrix}u & v & 1\end{bmatrix}^T$ are homogeneous coordinates of point in image space, 
+$\mathbf{K}$ is a calibration matrix, 
+$\mathbf{r_i}$ are column vectors of the rotation matrix between two cameras, $\mathbf{t}$ is a translation vector and
+$\begin{bmatrix}X & Y & Z & 1\end{bmatrix}^T$ are homogeneous coordinates of point in camera space
+\\
+Z coordinate of the point in the model space is 0, because all points on a checkerboard lies on the XY plane. In this case:
+$$s\begin{bmatrix}u \\ v \\ 1\end{bmatrix} =
+\mathbf{K}\begin{bmatrix}\mathbf{r_1} & \mathbf{r_2} & \mathbf{t} \end{bmatrix}\begin{bmatrix}X \\ Y \\ 1\end{bmatrix}$$
+
+To find the homography matrix it is required to find a solution to the equation:
+
+$$s\mathbf{\widetilde{q}} = \mathbf{H}\mathbf{\widetilde{p}},$$
+
+where $\mathbf{H}=\mathbf{K}\begin{bmatrix} \mathbf{r_1} & \mathbf{r_2} & \mathbf{t}\end{bmatrix}$ is the homography matrix.\\
+
+I do it by solving optimization problem:
+$$\min_{\mathbf{H}}\sum_{j}||\mathbf{L}_j\mathbf{x}||^2,$$ where
+$\mathbf{L}_j = 
+\begin{bmatrix}
+-X_j & -Y_j & -1 & 0 & 0 & 0 & u_jX_j & u_jY_j u_j \\
+0 & 0 & 0 & -X_j & -Y_j & -1 & v_jX_j & v_jY_j v_j
+\end{bmatrix}$ and \\
+$\mathbf{x}^T = 
+\begin{bmatrix}
+h_{11} & h_{12} & h_{13} & h_{21} & h_{22} & h{23} & h_{31} & h_{32} & h_{33}
+\end{bmatrix}$. \\
+
+Homography matrix $\mathbf{H}$ has to be normalized. The procedure for finding final matrix using SVD algorithm $\mathbf{H}$ and normalization of the matrix shows MATLAB code:
+
+\begin{lstlisting}[style=Matlab-editor]
+% numView - number of corresponding pictures
+for nv = 1:numView
+    [~, Sh, Vh] = svd(L(:,:,nv));
+    % search for index of min. singular value
+    [~, index] = min(diag(Sh));
+    Vht = Vh';
+    homography(:, :, nv) = reshape(Vht(index, :), [3,3])';
+end
+% H matrix normalization
+for nv = 1:numView
+   homography(:, :, nv) = homography(:, :, nv)/homography(3, 3, nv); 
+end
+\end{lstlisting}
+
+To extract intrinsic camera parameters from homography $$\mathbf{H}$ I build another equation from following constraints: 
+$$\mathbf{r}_1^T\mathbf{r}_1 = \mathbf{r}^T\mathbf{r}_2 and \mathbf{r}_1^T\mathbf{r}_2 = 0$$, where $\mathbf{r}_1 = \mathbf{K}^{-1}\mathbf{h}_1$ and $\mathbf{r}_2 = \mathbf{K}^{-1}\mathbf{h}_2$.\\
+
+I derive the optimization problem $$min_b||\mathbf{V}\mathbf{b}||^2$$, subject to $||\mathbf{b}||^2=1$, where $\mathbf{B} = \mathbf{K}^{-T}\mathbf{K}^{-1}$, 
+$b = \begin{bmatrix}
+B_{11} & B_{12} & B_{13} & B_{22} & B_{23} & B_{33}
+\end{bmatrix}^T$, $\mathbf{v}_{kl} = 
+\begin{bmatrix}
+h_{1k}h_{1l} & h_{1k}h_{2l} + h_{2k}h_{1l} & h_{1k}h_{3l} + h_{3k}h_{1l} & h_{2k}h_{2l} & h_{2k}h_{3l} + h_{3k}h_{2l} & h_{3k}h_{3l}
+\end{bmatrix}^T$ and $\mathbf{V} = 
+\begin{bmatrix}
+\mathbf{v}_{12} & (\mathbf{v}_{11} - \methbf{v}_{22})
+\end{bmatrix}^T$.\\ \\
+In this case I also use SVD to obtain results for \mathbf{b} matrix:
+\begin{lstlisting}[style=Matlab-editor]
+% compute b from SVD
+[~, Sv, Vv] = svd(V);
+% search for index of min. singular value
+[~, index] = min(diag(Sv));
+Vvt = Vv';
+b = Vvt(index,:);
+\end{lstlisting}
+I than extract intrinsic parameters from matrix $\mathbf{b}$.
+
+\subsection*{Finding extrinsic parameters of the cameras}
+for every view scale parameter $\lambda'$ is different, so I coumputed it as: $$\lambda'=\frac{1/||\mathbf{K}^{-1}\mathbf{h}_1|| = 1/||\mathbf{K}^{-1}\mathbf{h}_2||}{2}$$, so update extrinsic parameters would be in the form:
+$$\mathbf{r}_1 = \lambda'\mathbf{K}^{-1}\mathbf{h}_1 \; \mathbf{r}_2 = \lambda'\mathbf{K}^{-1}\mathbf{h}_2 \;
+\mathbf{r}_3 = \mathbf_{1} \times \mathbf{r}_2 \;
+\mathbf{t} = \lambda'\mathbf{K}^{-1}\mathbf{h}_3$$
+Obtained rotation matrix $\mathbf{R}$ have to be rescaled using SVD to satisfy properties of the roation matrix in a way:
+$$\mathbf{R} = \mathbf{U}\mathbf{\sigma}\mathbf{V}^T$$
+$$\mathbf{R}':= \mathbf{U}\mathbf{V}^T$$.
+\subsection*{Nonlinear optimization for intrinsic and extrinsic parameters}
+I obtain matrices for intrinsic parameters $\mathbf{K}$, rotation $\mathbf{R}'_i$ and translation $t_i$ for each image i. To optimize solution which is was based on the distance and SVD decomposition I use maximum likelihood estimator to tune the parameters by minimizing 
+$$min_{\mathbf{K},\mathbf{R}_i,\mathbf{t}_i}\sigma_{i}\sigma_{j}||\mathbf{q}_{ij}-\mathbf{\hat{q}}_{ij}||^2$$ with initial guess from previous estimation. This procedure shows following MATLAB code:
+\begin{lstlisting}[style=Matlab-editor]
+%% Maximum likelihood estimation (section 3.2)
+options = optimoptions(@lsqnonlin, 'Algorithm', 'levenberg-marquardt', ...
+    'TolX', 1e-32, 'TolFun', 1e-32, 'MaxFunEvals', 1e64, ...
+    'MaxIter', 1e64, 'UseParallel', true, 'Display', 'iter');
+
+x0 = zeros(5 + 6 * size(imagePoints, 3), 1);
+x0(1:5,1) = [alpha; beta; gamma; u0; v0];
+for nv = 1:numView
+    x0(6+(nv-1)*size(imagePoints, 3) : 6+nv*size(imagePoints, 3)-1, 1) = ...
+    [rotationMatrixToVector(Rt(:,1:3,nv))'; Rt(:,4,nv)]; 
+end
+
+% Non-least square optimization
+[objective] = @(x) func_calibration(imagePoints, worldPoints, x);
+
+[x_hat, ~, ~, ~, ~] = lsqnonlin(objective,x0,[],[],options);
+
+%% Build camera parameters
+rvecs = zeros(numView, 3);
+tvecs = zeros(numView, 3);
+K = [1, 0, 0
+     0, 1, 0
+     0, 0, 1];
+
+% Extract intrinsic matrix K, rotation vectors and translation vectors from x_hat
+K = [[x_hat(1,1), x_hat(3,1), x_hat(4,1)];...
+    [0, x_hat(2,1), x_hat(5,1)];...
+    [0, 0, 1]];
+
+for nv=1:numView
+    rvecs(nv, :) = x_hat(6+(nv-1)*6 : 6+(nv-1)*6+2, 1)';
+    tvecs(nv, :) = x_hat(6+(nv-1)*6+3 : 6+(nv-1)*6+5, 1)';
+    Rrr = rotationVectorToMatrix(x_hat(6+(nv-1)*6 : 6+(nv-1)*6+2, 1));
+    rvecs(nv, :) = rotationMatrixToVector(Rrr');
+end
+\end{lstlisting}
+
+\section*{Calibration results}
+Obtained results for both cameras gives overal mean reprojection error of points on the checkerboard around 0.04 pixels. End optimization of the parameters bring the improvment of about $0.99987 \%$ (!). These improvment is shown in Figure \ref{fig:result1}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=6cm]{mean_repr_error_after_opt.jpg}
+    \includegraphics[width=6cm]{mean_repr_error_before_opt.jpg}
+    \caption{\emph{Left:} Results after non-linear optimization \emph{Right:} Results without non-linear optimization.}
+    \label{fig:result1}
+\end{figure}
+
+\section*{Calculating depth maps}
+In this part I calculate depth map for two scenes, having images of the same scene from two cameras with specific translation.\\
+Images are first of all rectified and than color for every image is converted to the grayscale for simplicity of the computation.\\
+In the process of getting depth map I use plane-sweeping algorithm, which for every disparity between images compute a cost function.\\
+To make a 3D cost function $\mathbf{C}$, where $size(\mathbf{C})=(width \times height \times (maxDisparity-minDisparity)$ for every disparity we use Normalized Cross Correlation:
+$$NCC = \frac{\Sigma_{i}\Sigma_{j}(A(i,j) - E[A(i,j)])(B(i,j)-E[B(i,j)])}
+{\sqrt(\Sigma_{i}\Sigma_{j}(A(i,j)^2)\sqrt(\Sigma_{i}\Sigma_{j}(B(i,j)^2)}$$,\\
+where $E[A(i,j)]$ is mean value of the patch which is used to computing of NCC between two pictures for every disparity.\\
+I than find the maximum NCC cost for every pixel at the image and choose disparity which correspodns to it. In this way there is made the disparity map which is showed below.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=10cm]{scene1_original.jpg}
+    \caption{Original image: scene 1}
+    \label{fig:scene1_original}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=6cm]{scene1_disparity.jpg}
+    \includegraphics[width=6cm]{scene1_depth.jpg}
+    \caption{\emph{Left:} Disparity Map for scene 1 \emph{Right:} Depth Map for scene 1.}
+    \label{fig:scene1_depth_disparity}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=10cm]{scene2_original.jpg}
+    \caption{Original image: scene 2}
+    \label{fig:scene2_original}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=6.5cm]{scene2_disparity.jpg}
+    \includegraphics[width=6.5cm]{scene2_depth.jpg}
+    \caption{\emph{Left:} Disparity Map for scene 2 \emph{Right:} Depth Map for scene 2.}
+    \label{fig:scene2_depth_disparity}
+\end{figure}
+
+\subsection*{Final results}
+Results for two scenes prove that plane sweeping algorithm could be used for calculating disparity maps in the simple settings.
+\begin{center}
+ \begin{tabular}{||c c c c c||} 
+ \hline
+ Scene No. & NCC filter[size] & Min\_Disp [pixel] & Max\_Disp[pixel] & Mean Depth Error[mm] \\ [0.5ex] 
+ \hline\hline
+ 1 & [5, 5] & 30 & 110 & 394.64\\ 
+ \hline
+ 2 & [5, 5] & 5 & 70 & 1869.28\\  [1ex] 
+ \hline
+\end{tabular}
+\end{center}
+However obtained disparity maps are noisy and can't give a proper results on surfaces which are plain (i.e. irregular map for chair which is relatively close in scene 2). Antidote for those drawback could be using interpolation or machine learning algorithms.
+\medskip 
+ \begin{figure}[H]
+\printbibliography
+\end{figure}
+
+\end{document}
