@@ -1,0 +1,169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title>Homework 1 Writeup</title>
+  <style type="text/css">code{white-space: pre;}</style>
+</head>
+<body>
+<div id="header">
+<h1 class="title">Homework 1 Writeup</h1>
+</div>
+<h1 id="objective-of-the-work" class="unnumbered">Objective of the work</h1>
+<p>The main objectives of the work were:</p>
+<ul>
+<li><p>Finding extrinsic and intrinsic parameters of the cameras to stereo vision application using Zhang’ Method <span class="citation"></span></p></li>
+<li><p>Depth estimation of the objects at the two photos using plane sweeping algorithm</p></li>
+</ul>
+<p>To this task I used Matlab Toolbox with dependencies: Optimization Toolbox and Computer Vision System Toolbox.</p>
+<h1 id="zhangs-method-for-finding-camera-parameters" class="unnumbered">Zhang’s method for finding camera parameters</h1>
+<p>Method described in article <span class="citation"></span> uses checkerboard to find extrinsic and intrinsic camera parameters. In the work I used 6 images to calibrate left camera and 6 to calibrate right camera.</p>
+<h2 id="finding-intrinsic-parameters-of-the-cameras" class="unnumbered">Finding intrinsic parameters of the cameras</h2>
+<p>Relation between points in the model space and image space could be written as: <br /><span class="math display">$$s\begin{bmatrix}u \\ v \\ 1\end{bmatrix} =
+\mathbf{K}\begin{bmatrix}\mathbf{r_1} &amp; \mathbf{r_2} &amp; \mathbf{r_3} &amp; \mathbf{t} \end{bmatrix}\begin{bmatrix}X \\ Y \\ Z \\ 1\end{bmatrix}$$</span><br />,</p>
+<p>where <span class="math inline"><em>s</em></span> is a scaling factor, <span class="math inline">$\begin{bmatrix}u &amp; v &amp; 1\end{bmatrix}^T$</span> are homogeneous coordinates of point in image space, <span class="math inline"><strong>K</strong></span> is a calibration matrix, <span class="math inline"><strong>r</strong><sub><strong>i</strong></sub></span> are column vectors of the rotation matrix between two cameras, <span class="math inline"><strong>t</strong></span> is a translation vector and <span class="math inline">$\begin{bmatrix}X &amp; Y &amp; Z &amp; 1\end{bmatrix}^T$</span> are homogeneous coordinates of point in camera space<br />
+Z coordinate of the point in the model space is 0, because all points on a checkerboard lies on the XY plane. In this case: <br /><span class="math display">$$s\begin{bmatrix}u \\ v \\ 1\end{bmatrix} =
+\mathbf{K}\begin{bmatrix}\mathbf{r_1} &amp; \mathbf{r_2} &amp; \mathbf{t} \end{bmatrix}\begin{bmatrix}X \\ Y \\ 1\end{bmatrix}$$</span><br /></p>
+<p>To find the homography matrix it is required to find a solution to the equation:</p>
+<p><br /><span class="math display">$$s\mathbf{\widetilde{q}} = \mathbf{H}\mathbf{\widetilde{p}},$$</span><br /></p>
+<p>where <span class="math inline">$\mathbf{H}=\mathbf{K}\begin{bmatrix} \mathbf{r_1} &amp; \mathbf{r_2} &amp; \mathbf{t}\end{bmatrix}$</span> is the homography matrix.<br />
+I do it by solving optimization problem: <br /><span class="math display">min<sub><strong>H</strong></sub>∑<sub><em>j</em></sub>||<strong>L</strong><sub><em>j</em></sub><strong>x</strong>||<sup>2</sup>,</span><br /> where <span class="math inline">$\mathbf{L}_j = 
+\begin{bmatrix}
+-X_j &amp; -Y_j &amp; -1 &amp; 0 &amp; 0 &amp; 0 &amp; u_jX_j &amp; u_jY_j u_j \\
+0 &amp; 0 &amp; 0 &amp; -X_j &amp; -Y_j &amp; -1 &amp; v_jX_j &amp; v_jY_j v_j
+\end{bmatrix}$</span> and<br />
+<span class="math inline">$\mathbf{x}^T = 
+\begin{bmatrix}
+h_{11} &amp; h_{12} &amp; h_{13} &amp; h_{21} &amp; h_{22} &amp; h{23} &amp; h_{31} &amp; h_{32} &amp; h_{33}
+\end{bmatrix}$</span>.<br />
+Homography matrix <span class="math inline"><strong>H</strong></span> has to be normalized. The procedure for finding final matrix using SVD algorithm <span class="math inline"><strong>H</strong></span> and normalization of the matrix shows MATLAB code:</p>
+<pre><code>% numView - number of corresponding pictures
+for nv = 1:numView
+    [~, Sh, Vh] = svd(L(:,:,nv));
+    % search for index of min. singular value
+    [~, index] = min(diag(Sh));
+    Vht = Vh&#39;;
+    homography(:, :, nv) = reshape(Vht(index, :), [3,3])&#39;;
+end
+% H matrix normalization
+for nv = 1:numView
+   homography(:, :, nv) = homography(:, :, nv)/homography(3, 3, nv); 
+end</code></pre>
+<p>To extract intrinsic camera parameters from homography <br /><span class="math display"><strong>H</strong></span><br /> I build another equation from following constraints: <br /><span class="math display"><strong>r</strong><sub>1</sub><sup><em>T</em></sup><strong>r</strong><sub>1</sub> = <strong>r</strong><sup><em>T</em></sup><strong>r</strong><sub>2</sub><em>a</em><em>n</em><em>d</em><strong>r</strong><sub>1</sub><sup><em>T</em></sup><strong>r</strong><sub>2</sub> = 0</span><br />, where <span class="math inline"><strong>r</strong><sub>1</sub> = <strong>K</strong><sup>−1</sup><strong>h</strong><sub>1</sub></span> and <span class="math inline"><strong>r</strong><sub>2</sub> = <strong>K</strong><sup>−1</sup><strong>h</strong><sub>2</sub></span>.<br />
+I derive the optimization problem <br /><span class="math display"><em>m</em><em>i</em><em>n</em><sub><em>b</em></sub>||<strong>V</strong><strong>b</strong>||<sup>2</sup></span><br />, subject to <span class="math inline">||<strong>b</strong>||<sup>2</sup> = 1</span>, where <span class="math inline"><strong>B</strong> = <strong>K</strong><sup>−<em>T</em></sup><strong>K</strong><sup>−1</sup></span>, <span class="math inline">$b = \begin{bmatrix}
+B_{11} &amp; B_{12} &amp; B_{13} &amp; B_{22} &amp; B_{23} &amp; B_{33}
+\end{bmatrix}^T$</span>, <span class="math inline">$\mathbf{v}_{kl} = 
+\begin{bmatrix}
+h_{1k}h_{1l} &amp; h_{1k}h_{2l} + h_{2k}h_{1l} &amp; h_{1k}h_{3l} + h_{3k}h_{1l} &amp; h_{2k}h_{2l} &amp; h_{2k}h_{3l} + h_{3k}h_{2l} &amp; h_{3k}h_{3l}
+\end{bmatrix}^T$</span> and <span class="math inline">$\mathbf{V} = 
+\begin{bmatrix}
+\mathbf{v}_{12} &amp; (\mathbf{v}_{11} - \mathbf{v}_{22})
+\end{bmatrix}^T$</span>.<br />
+<br />
+In this case I also use SVD to obtain results for <span class="math inline"><strong>b</strong></span> matrix:</p>
+<pre><code>% compute b from SVD
+[~, Sv, Vv] = svd(V);
+% search for index of min. singular value
+[~, index] = min(diag(Sv));
+Vvt = Vv&#39;;
+b = Vvt(index,:);</code></pre>
+<p>I than extract intrinsic parameters from matrix <span class="math inline"><strong>b</strong></span>.</p>
+<h2 id="finding-extrinsic-parameters-of-the-cameras" class="unnumbered">Finding extrinsic parameters of the cameras</h2>
+<p>for every view scale parameter <span class="math inline"><em>λ</em>′</span> is different, so I coumputed it as: <br /><span class="math display">$$\lambda'=\frac{1/||\mathbf{K}^{-1}\mathbf{h}_1|| = 1/||\mathbf{K}^{-1}\mathbf{h}_2||}{2}$$</span><br />, so update extrinsic parameters would be in the form: <br /><span class="math display"><strong>r</strong><sub>1</sub> = <em>λ</em>′<strong>K</strong><sup>−1</sup><strong>h</strong><sub>1</sub> <strong>r</strong><sub>2</sub> = <em>λ</em>′<strong>K</strong><sup>−1</sup><strong>h</strong><sub>2</sub> <strong>r</strong><sub>3</sub> = <strong>r</strong><sub>1</sub> × <strong>r</strong><sub>2</sub> <strong>t</strong> = <em>λ</em>′<strong>K</strong><sup>−1</sup><strong>h</strong><sub>3</sub></span><br /> Obtained rotation matrix <span class="math inline"><strong>R</strong></span> have to be rescaled using SVD to satisfy properties of the roation matrix in a way: <br /><span class="math display"><strong>R</strong> = <strong>U</strong><strong>σ</strong><strong>V</strong><sup><em>T</em></sup></span><br /> <br /><span class="math display"><strong>R</strong>′:=<strong>U</strong><strong>V</strong><sup><em>T</em></sup></span><br />.</p>
+<h2 id="nonlinear-optimization-for-intrinsic-and-extrinsic-parameters" class="unnumbered">Nonlinear optimization for intrinsic and extrinsic parameters</h2>
+<p>I obtain matrices for intrinsic parameters <span class="math inline"><strong>K</strong></span>, rotation <span class="math inline"><strong>R</strong>′<sub><em>i</em></sub></span> and translation <span class="math inline"><em>t</em><sub><em>i</em></sub></span> for each image i. To optimize solution which is was based on the distance and SVD decomposition I use maximum likelihood estimator to tune the parameters by minimizing <br /><span class="math display">$$min_{\mathbf{K},\mathbf{R}_i,\mathbf{t}_i}\sigma_{i}\sigma_{j}||\mathbf{q}_{ij}-\mathbf{\hat{q}}_{ij}||^2$$</span><br /> with initial guess from previous estimation. This procedure shows following MATLAB code:</p>
+<pre><code>%% Maximum likelihood estimation (section 3.2)
+options = optimoptions(@lsqnonlin, &#39;Algorithm&#39;, &#39;levenberg-marquardt&#39;, ...
+    &#39;TolX&#39;, 1e-32, &#39;TolFun&#39;, 1e-32, &#39;MaxFunEvals&#39;, 1e64, ...
+    &#39;MaxIter&#39;, 1e64, &#39;UseParallel&#39;, true, &#39;Display&#39;, &#39;iter&#39;);
+
+x0 = zeros(5 + 6 * size(imagePoints, 3), 1);
+x0(1:5,1) = [alpha; beta; gamma; u0; v0];
+for nv = 1:numView
+    x0(6+(nv-1)*size(imagePoints, 3) : 6+nv*size(imagePoints, 3)-1, 1) = ...
+    [rotationMatrixToVector(Rt(:,1:3,nv))&#39;; Rt(:,4,nv)]; 
+end
+
+% Non-least square optimization
+[objective] = @(x) func_calibration(imagePoints, worldPoints, x);
+
+[x_hat, ~, ~, ~, ~] = lsqnonlin(objective,x0,[],[],options);
+
+%% Build camera parameters
+rvecs = zeros(numView, 3);
+tvecs = zeros(numView, 3);
+K = [1, 0, 0
+     0, 1, 0
+     0, 0, 1];
+
+% Extract intrinsic matrix K, rotation vectors and translation vectors from x_hat
+K = [[x_hat(1,1), x_hat(3,1), x_hat(4,1)];...
+    [0, x_hat(2,1), x_hat(5,1)];...
+    [0, 0, 1]];
+
+for nv=1:numView
+    rvecs(nv, :) = x_hat(6+(nv-1)*6 : 6+(nv-1)*6+2, 1)&#39;;
+    tvecs(nv, :) = x_hat(6+(nv-1)*6+3 : 6+(nv-1)*6+5, 1)&#39;;
+    Rrr = rotationVectorToMatrix(x_hat(6+(nv-1)*6 : 6+(nv-1)*6+2, 1));
+    rvecs(nv, :) = rotationMatrixToVector(Rrr&#39;);
+end</code></pre>
+<h1 id="calibration-results" class="unnumbered">Calibration results</h1>
+<p>Obtained results for both cameras gives overal mean reprojection error of points on the checkerboard around 0.04 pixels. End optimization of the parameters bring the improvment of about <span class="math inline">0.99987%</span> (!). These improvment is shown in Figure [fig:result1]</p>
+<p><img src="mean_repr_error_after_opt.jpg" title="fig:" alt="Left: Results after non-linear optimization Right: Results without non-linear optimization." width="226" /> <img src="mean_repr_error_before_opt.jpg" title="fig:" alt="Left: Results after non-linear optimization Right: Results without non-linear optimization." width="226" /></p>
+<h1 id="calculating-depth-maps" class="unnumbered">Calculating depth maps</h1>
+<p>In this part I calculate depth map for two scenes, having images of the same scene from two cameras with specific translation.<br />
+Images are first of all rectified and than color for every image is converted to the grayscale for simplicity of the computation.<br />
+In the process of getting depth map I use plane-sweeping algorithm, which for every disparity between images compute a cost function.<br />
+To make a 3D cost function <span class="math inline"><strong>C</strong></span>, where <span class="math inline"><em>s</em><em>i</em><em>z</em><em>e</em>(<strong>C</strong>)=(<em>w</em><em>i</em><em>d</em><em>t</em><em>h</em> × <em>h</em><em>e</em><em>i</em><em>g</em><em>h</em><em>t</em> × (<em>m</em><em>a</em><em>x</em><em>D</em><em>i</em><em>s</em><em>p</em><em>a</em><em>r</em><em>i</em><em>t</em><em>y</em> − <em>m</em><em>i</em><em>n</em><em>D</em><em>i</em><em>s</em><em>p</em><em>a</em><em>r</em><em>i</em><em>t</em><em>y</em>)</span> for every disparity we use Normalized Cross Correlation: <br /><span class="math display">$$NCC = \frac{\Sigma_{i}\Sigma_{j}(A(i,j) - E[A(i,j)])(B(i,j)-E[B(i,j)])}
+{\sqrt(\Sigma_{i}\Sigma_{j}(A(i,j)^2)\sqrt(\Sigma_{i}\Sigma_{j}(B(i,j)^2)}$$</span><br />,<br />
+where <span class="math inline"><em>E</em>[<em>A</em>(<em>i</em>, <em>j</em>)]</span> is mean value of the patch which is used to computing of NCC between two pictures for every disparity.<br />
+I than find the maximum NCC cost for every pixel at the image and choose disparity which correspodns to it. In this way there is made the disparity map which is showed below.</p>
+<div class="figure">
+<img src="scene1_original.jpg" alt="Original image: scene 1" width="377" />
+<p class="caption">Original image: scene 1<span data-label="fig:scene1_original"></span></p>
+</div>
+<p><img src="scene1_disparity.jpg" title="fig:" alt="Left: Disparity Map for scene 1 Right: Depth Map for scene 1." width="226" /> <img src="scene1_depth.jpg" title="fig:" alt="Left: Disparity Map for scene 1 Right: Depth Map for scene 1." width="226" /></p>
+<div class="figure">
+<img src="scene2_original.jpg" alt="Original image: scene 2" width="377" />
+<p class="caption">Original image: scene 2<span data-label="fig:scene2_original"></span></p>
+</div>
+<p><img src="scene2_disparity.jpg" title="fig:" alt="Left: Disparity Map for scene 2 Right: Depth Map for scene 2." width="245" /> <img src="scene2_depth.jpg" title="fig:" alt="Left: Disparity Map for scene 2 Right: Depth Map for scene 2." width="245" /></p>
+<h2 id="final-results" class="unnumbered">Final results</h2>
+<p>Results for two scenes prove that plane sweeping algorithm could be used for calculating disparity maps in the simple settings.</p>
+<table>
+<tbody>
+<tr class="odd">
+<td align="center">Scene No.</td>
+<td align="center">NCC filter[size]</td>
+<td align="center">Min_Disp [pixel]</td>
+<td align="center">Max_Disp[pixel]</td>
+<td align="center">Mean Depth Error[mm]</td>
+</tr>
+<tr class="even">
+<td align="center">[0.5ex] 1</td>
+<td align="center">[5, 5]</td>
+<td align="center">30</td>
+<td align="center">110</td>
+<td align="center">394.64</td>
+</tr>
+<tr class="odd">
+<td align="center">2</td>
+<td align="center">[5, 5]</td>
+<td align="center">5</td>
+<td align="center">70</td>
+<td align="center">1869.28</td>
+</tr>
+<tr class="even">
+<td align="center">[1ex]</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+</tbody>
+</table>
+<p>However obtained disparity maps are noisy and can’t give a proper results on surfaces which are plain (i.e. irregular map for chair which is relatively close in scene 2). Antidote for those drawback could be using interpolation or machine learning algorithms.</p>
+</body>
+</html>
